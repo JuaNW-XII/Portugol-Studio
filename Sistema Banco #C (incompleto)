@@ -1,0 +1,285 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_USUARIO 50
+#define MAX_SENHA 50
+#define MAX_EMAIL 100
+#define MAX_CPF 15
+#define ARQUIVO_CONTAS "contas.txt"
+
+typedef struct {
+    char usuario[MAX_USUARIO];
+    char senha[MAX_SENHA];
+    char email[MAX_EMAIL];
+    char cpf[MAX_CPF];
+    int saldo; // Saldo da conta
+} Conta;
+
+Conta contaAtual; // Conta ativa no momento
+int contaLogada = 0; // Flag para indicar se há conta logada
+
+// Função para registrar uma conta
+void registrarConta() {
+    FILE *arquivo = fopen(ARQUIVO_CONTAS, "a");
+    if (arquivo == NULL) {
+        printf("Erro ao abrir o arquivo de contas.\n");
+        return;
+    }
+
+    Conta novaConta;
+    printf("Digite o nome de usuario: ");
+    scanf("%s", novaConta.usuario);
+    printf("Digite a senha: ");
+    scanf("%s", novaConta.senha);
+    printf("Digite o email: ");
+    scanf("%s", novaConta.email);
+    printf("Digite o CPF: ");
+    scanf("%s", novaConta.cpf);
+    novaConta.saldo = 0; // Saldo inicial da conta é zero
+
+    fprintf(arquivo, "%s %s %s %s %d\n", novaConta.usuario, novaConta.senha, novaConta.email, novaConta.cpf, novaConta.saldo);
+    fclose(arquivo);
+
+    contaAtual = novaConta;
+    contaLogada = 1;
+    printf("Conta registrada e login efetuado com sucesso! Bem-vindo(a), %s.\n", contaAtual.usuario);
+    printf("\n");
+}
+
+// Função para realizar login
+void realizarLogin() {
+    FILE *arquivo = fopen(ARQUIVO_CONTAS, "r");
+    if (arquivo == NULL) {
+        printf("Erro ao abrir o arquivo de contas.\n");
+        printf("\n");
+        return;
+    }
+
+    char usuario[MAX_USUARIO];
+    char senha[MAX_SENHA];
+    int loginValido = 0;
+
+    printf("Digite o nome de usuário: ");
+    scanf("%s", usuario);
+    printf("Digite a senha: ");
+    scanf("%s", senha);
+
+    Conta conta;
+    while (fscanf(arquivo, "%s %s %s %s %d", conta.usuario, conta.senha, conta.email, conta.cpf, &conta.saldo) != EOF) {
+        if (strcmp(usuario, conta.usuario) == 0 && strcmp(senha, conta.senha) == 0) {
+            loginValido = 1;
+            contaAtual = conta;
+            contaLogada = 1;
+            break;
+        }
+    }
+
+    fclose(arquivo);
+
+    if (loginValido) {
+        printf("Login bem-sucedido! Bem-vindo(a), %s.\n", contaAtual.usuario);
+        printf("\n");
+    } else {
+        printf("Falha no login. Usuário ou senha incorretos.\n");
+        printf("\n");
+    }
+}
+
+// Função para salvar saldo atualizado no arquivo
+void salvarContas() {
+    FILE *arquivo = fopen(ARQUIVO_CONTAS, "r");
+    FILE *temp = fopen("temp.txt", "w");
+
+    if (arquivo == NULL || temp == NULL) {
+        printf("Erro ao acessar os arquivos.\n");
+        return;
+    }
+
+    Conta conta;
+    while (fscanf(arquivo, "%s %s %s %s %d", conta.usuario, conta.senha, conta.email, conta.cpf, &conta.saldo) != EOF) {
+        if (strcmp(conta.usuario, contaAtual.usuario) == 0) {
+            conta.saldo = contaAtual.saldo;
+        }
+        fprintf(temp, "%s %s %s %s %d\n", conta.usuario, conta.senha, conta.email, conta.cpf, conta.saldo);
+    }
+
+    fclose(arquivo);
+    fclose(temp);
+    remove(ARQUIVO_CONTAS);
+    rename("temp.txt", ARQUIVO_CONTAS);
+}
+
+// Função para exibir informações da conta atual
+void exibirInformacoesConta() {
+    if (contaLogada) {
+        printf("\n--- Informações da Conta Ativa ---\n");
+        printf("Usuario: %s\n", contaAtual.usuario);
+        printf("Email: %s\n", contaAtual.email);
+        printf("CPF: %s\n", contaAtual.cpf);
+        printf("Saldo: R$ %d\n", contaAtual.saldo);
+        printf("----------------------------------\n\n");
+    } else {
+        printf("Nenhuma conta está logada no momento.\n");
+    }
+}
+
+// Função para transferir dinheiro entre contas
+void transferirDinheiro() {
+    if (!contaLogada) {
+        printf("Voce precisa estar logado para realizar transferencias.\n");
+        return;
+    }
+
+    char usuarioDestino[MAX_USUARIO];
+    int valorTransferencia;
+
+    printf("Digite o nome de usuario do destinatário: ");
+    scanf("%s", usuarioDestino);
+    printf("Digite o valor a ser transferido: ");
+    scanf("%d", &valorTransferencia);
+
+    if (valorTransferencia <= 0 || valorTransferencia > contaAtual.saldo) {
+        printf("Transferência invalida. Verifique seu saldo.\n");
+        return;
+    }
+
+    FILE *arquivo = fopen(ARQUIVO_CONTAS, "r");
+    FILE *temp = fopen("temp.txt", "w");
+
+    if (arquivo == NULL || temp == NULL) {
+        printf("Erro ao acessar os arquivos.\n");
+        return;
+    }
+
+    Conta conta;
+    int transferenciaRealizada = 0;
+
+    while (fscanf(arquivo, "%s %s %s %s %d", conta.usuario, conta.senha, conta.email, conta.cpf, &conta.saldo) != EOF) {
+        if (strcmp(conta.usuario, usuarioDestino) == 0) {
+            conta.saldo += valorTransferencia;
+            transferenciaRealizada = 1;
+        }
+        if (strcmp(conta.usuario, contaAtual.usuario) == 0) {
+            contaAtual.saldo -= valorTransferencia;
+            conta.saldo = contaAtual.saldo;
+        }
+        fprintf(temp, "%s %s %s %s %d\n", conta.usuario, conta.senha, conta.email, conta.cpf, conta.saldo);
+    }
+
+    fclose(arquivo);
+    fclose(temp);
+    remove(ARQUIVO_CONTAS);
+    rename("temp.txt", ARQUIVO_CONTAS);
+
+    if (transferenciaRealizada) {
+        printf("Transferencia realizada com sucesso!\n");
+        printf("\n");
+    } else {
+        printf("Usuario destinatário não encontrado.\n");
+        printf("\n");
+    }
+}
+
+// Função principal
+int main() {
+    int opcao, escolha, valor;
+
+    srand(time(NULL));
+    contaAtual.saldo = 0;
+
+    do {
+        printf("--- Pobre's Bank ---\n");
+        if (contaLogada) {
+            printf("Saldo: R$ %d\n", contaAtual.saldo);
+        } else {
+            printf("Nenhuma conta ativa.\n");
+        }
+        printf("(1) Conta\n");
+        printf("(2) Transacoes\n");
+        printf("(3) Investimentos\n");
+        printf("(0) Sair\n");
+        printf("Opcao: ");
+        scanf("%d", &opcao);
+        printf("\n");
+
+        switch (opcao) {
+            case 1:
+                do {
+                    printf("--- Sistema de Conta ---\n");
+                    printf("(1) Registrar nova conta\n");
+                    printf("(2) Fazer login\n");
+                    printf("(3) Ver informacoes da conta\n");
+                    printf("(4) Voltar\n");
+                    printf("Escolha: ");
+                    scanf("%d", &escolha);
+                    printf("\n");
+
+                    if (escolha == 1) {
+                        registrarConta();
+                    } else if (escolha == 2) {
+                        realizarLogin();
+                    } else if (escolha == 3) {
+                        exibirInformacoesConta();
+                    }
+                } while (escolha != 4);
+                break;
+
+            case 2:
+                if (!contaLogada) {
+                    printf("Voce precisa estar logado para acessar as transacoes.\n");
+                    printf("\n");
+                    break;
+                }
+                printf("--- Sistema de Transacoes ---\n");
+                printf("(1) Depositar\n(2) Sacar\n(3) Transferir\n(0) Voltar\nOpcao: ");
+                scanf("%d", &escolha);
+                printf("\n");
+                if (escolha == 1) {
+                    printf("Digite o valor para deposito: ");
+                    scanf("%d", &valor);
+                    printf("Deposito realizado com sucesso!\n");
+                    printf("\n");
+                    contaAtual.saldo += valor;
+                    salvarContas();
+                } else if (escolha == 2) {
+                    printf("Digite o valor para saque: ");
+                    scanf("%d", &valor);
+                    printf("Saque realizado com sucesso!\n");
+                    printf("\n");
+                    if (valor > 0 && valor <= contaAtual.saldo) {
+                        contaAtual.saldo -= valor;
+                        salvarContas();
+                    } else {
+                        printf("Valor invalido.\n");
+                        printf("\n");
+                    }
+                } else if (escolha == 3) {
+                    transferirDinheiro();
+                }
+                break;
+
+            case 3:
+                if (!contaLogada) {
+                    printf("Voce precisa estar logado para acessar os investimentos.\n");
+                    printf("\n");
+                } else {
+                    printf("Funcionalidade em desenvolvimento...\n");
+                    printf("\n");
+                }
+                break;
+
+            case 0:
+                printf("Saindo do sistema...\n");
+                printf("\n");
+                break;
+
+            default:
+                printf("Opcao invalida.\n");
+                printf("\n");
+        }
+    } while (opcao != 0);
+
+    return 0;
+}
